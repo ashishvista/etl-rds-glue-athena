@@ -59,17 +59,17 @@ resource "aws_glue_connection" "rds_connection" {
 
 # Create ETL script locally first (using bookmark-based template)
 resource "local_file" "etl_script" {
-  content = templatefile("${path.module}/etl_job_template_upsert.py", {
+  content = templatefile("${path.module}/etl_job_template_delta_upsert.py", {
     s3_bucket = var.s3_bucket_name
     database_name = aws_glue_catalog_database.main.name
   })
-  filename = "${path.module}/../../glue_scripts/etl_job_bookmark.py"
+  filename = "${path.module}/../../glue_scripts/etl_job_delta_upsert.py"
 }
 
 # Upload Glue ETL script to S3
 resource "aws_s3_object" "etl_script" {
   bucket = var.s3_bucket_name
-  key    = "glue-scripts/etl_job_bookmark.py"
+  key    = "glue-scripts/etl_job_delta_upsert.py"
   source = local_file.etl_script.filename
   etag   = local_file.etl_script.content_md5
 
@@ -82,7 +82,7 @@ resource "aws_glue_job" "customers_etl" {
   role_arn = var.glue_role_arn
 
   command {
-    script_location = "s3://${var.s3_bucket_name}/glue-scripts/etl_job_bookmark.py"
+    script_location = "s3://${var.s3_bucket_name}/glue-scripts/etl_job_delta_upsert.py"
     python_version  = "3"
   }
 
@@ -98,6 +98,7 @@ resource "aws_glue_job" "customers_etl" {
     "--target_path"             = "s3://${var.s3_bucket_name}/customers/"
     "--database_name"           = aws_glue_catalog_database.main.name
     "--connection_name"         = aws_glue_connection.rds_connection.name
+    "--conf"                    = "spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension --conf spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog"
   }
 
   glue_version = "4.0"
@@ -115,7 +116,7 @@ resource "aws_glue_job" "orders_etl" {
   role_arn = var.glue_role_arn
 
   command {
-    script_location = "s3://${var.s3_bucket_name}/glue-scripts/etl_job_bookmark.py"
+    script_location = "s3://${var.s3_bucket_name}/glue-scripts/etl_job_delta_upsert.py"
     python_version  = "3"
   }
 
@@ -131,6 +132,7 @@ resource "aws_glue_job" "orders_etl" {
     "--target_path"             = "s3://${var.s3_bucket_name}/orders/"
     "--database_name"           = aws_glue_catalog_database.main.name
     "--connection_name"         = aws_glue_connection.rds_connection.name
+    "--conf"                    = "spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension --conf spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog"
   }
 
   glue_version = "4.0"
