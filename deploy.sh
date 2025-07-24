@@ -81,21 +81,19 @@ if [ "$load_data" == "yes" ]; then
     echo "📥 Loading sample data..."
     python3 load_data.py "$RDS_ENDPOINT" "analytics_db" "analytics_user" "ChangeMe123!"
     
-    echo "🚀 Starting ETL pipeline..."
-    echo "Running Customers ETL job..."
-    aws glue start-job-run --profile test-prod --job-name "$CUSTOMERS_ETL_JOB"
+    echo "🚀 Starting complete ETL pipeline (jobs + crawler)..."
+    python3 run_glue_jobs.py run-pipeline
     
-    echo "Running Orders ETL job..."
-    aws glue start-job-run --profile test-prod --job-name "$ORDERS_ETL_JOB"
-    
-    echo "✅ ETL jobs started. You can monitor them in the AWS Glue console."
+    echo "✅ Complete pipeline executed. Schema should now be available in Glue Catalog."
 fi
 
 echo ""
 echo "🎯 Next Steps:"
 echo "1. Open AWS Athena Console"
 echo "2. Select workgroup: $ATHENA_WORKGROUP" 
-echo "3. Run the pre-created named queries for data analysis"
-echo "4. Check S3 bucket: $S3_BUCKET for the data lake files"
+echo "3. Check available tables: SHOW TABLES IN data_analytics_database;"
+echo "4. Run the pre-created named queries for data analysis"
+echo "5. Check S3 bucket: $S3_BUCKET for the data lake files"
 echo ""
 echo "📚 For more information, see README.md"
+echo "🔄 For incremental testing, see INCREMENTAL_ETL.md"

@@ -59,14 +59,18 @@ python3 load_data.py $RDS_ENDPOINT analytics_db analytics_user ChangeMe123!
 Trigger the Glue ETL jobs to extract data from RDS and load into S3:
 
 ```bash
-# Run all ETL jobs
+# Run complete pipeline (ETL + crawler)
+python3 run_glue_jobs.py run-pipeline
+
+# Or run just ETL jobs
 python3 run_glue_jobs.py run-all
 
-# Or run individual jobs
+# Or run individual components
 python3 run_glue_jobs.py run data-analytics-customers-etl
 python3 run_glue_jobs.py run data-analytics-orders-etl
+python3 run_glue_jobs.py run-crawler data-analytics-crawler
 
-# List all available jobs
+# List all available jobs and crawlers
 python3 run_glue_jobs.py list
 ```
 

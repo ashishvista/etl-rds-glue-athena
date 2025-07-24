@@ -42,6 +42,25 @@ def create_tables(connection):
             )
         """)
         
+        # Create trigger to update updated_at for customers
+        cursor.execute("""
+            CREATE OR REPLACE FUNCTION update_updated_at_column()
+            RETURNS TRIGGER AS $$
+            BEGIN
+                NEW.updated_at = CURRENT_TIMESTAMP;
+                RETURN NEW;
+            END;
+            $$ language 'plpgsql';
+        """)
+        
+        cursor.execute("""
+            DROP TRIGGER IF EXISTS update_customers_updated_at ON customers;
+            CREATE TRIGGER update_customers_updated_at
+                BEFORE UPDATE ON customers
+                FOR EACH ROW
+                EXECUTE FUNCTION update_updated_at_column();
+        """)
+        
         # Create orders table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS orders (
@@ -55,7 +74,16 @@ def create_tables(connection):
             )
         """)
         
-        print("Tables created successfully")
+        # Create trigger to update updated_at for orders
+        cursor.execute("""
+            DROP TRIGGER IF EXISTS update_orders_updated_at ON orders;
+            CREATE TRIGGER update_orders_updated_at
+                BEFORE UPDATE ON orders
+                FOR EACH ROW
+                EXECUTE FUNCTION update_updated_at_column();
+        """)
+        
+        print("Tables and triggers created successfully")
         
         # Sample customer data
         customers = [

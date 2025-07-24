@@ -134,148 +134,44 @@ resource "aws_glue_job" "orders_etl" {
   }
 }
 
-# Glue Table for customer data
-resource "aws_glue_catalog_table" "customers" {
-  name          = "customers"
-  database_name = aws_glue_catalog_database.main.name
-
-  table_type = "EXTERNAL_TABLE"
-
-  parameters = {
-    "classification" = "parquet"
-  }
-
-  storage_descriptor {
-    location      = "s3://${var.s3_bucket_name}/customers/"
-    input_format  = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat"
-    output_format = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat"
-
-    ser_de_info {
-      serialization_library = "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe"
-    }
-
-    columns {
-      name = "customer_id"
-      type = "bigint"
-    }
-
-    columns {
-      name = "name"
-      type = "string"
-    }
-
-    columns {
-      name = "email"
-      type = "string"
-    }
-
-    columns {
-      name = "created_at"
-      type = "timestamp"
-    }
-  }
-
-  partition_keys {
-    name = "year"
-    type = "string"
-  }
-
-  partition_keys {
-    name = "month"
-    type = "string"
-  }
-
-  partition_keys {
-    name = "day"
-    type = "string"
-  }
-}
-
-# Glue Table for orders data
-resource "aws_glue_catalog_table" "orders" {
-  name          = "orders"
-  database_name = aws_glue_catalog_database.main.name
-
-  table_type = "EXTERNAL_TABLE"
-
-  parameters = {
-    "classification" = "parquet"
-  }
-
-  storage_descriptor {
-    location      = "s3://${var.s3_bucket_name}/orders/"
-    input_format  = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat"
-    output_format = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat"
-
-    ser_de_info {
-      serialization_library = "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe"
-    }
-
-    columns {
-      name = "order_id"
-      type = "bigint"
-    }
-
-    columns {
-      name = "customer_id"
-      type = "bigint"
-    }
-
-    columns {
-      name = "product_name"
-      type = "string"
-    }
-
-    columns {
-      name = "quantity"
-      type = "int"
-    }
-
-    columns {
-      name = "price"
-      type = "decimal(10,2)"
-    }
-
-    columns {
-      name = "order_date"
-      type = "date"
-    }
-  }
-
-  partition_keys {
-    name = "year"
-    type = "string"
-  }
-
-  partition_keys {
-    name = "month"
-    type = "string"
-  }
-
-  partition_keys {
-    name = "day"
-    type = "string"
-  }
-}
-
-# Glue Crawler for automatic schema discovery
+# Glue Crawler for automatic schema discovery and table creation
 resource "aws_glue_crawler" "data_lake_crawler" {
   database_name = aws_glue_catalog_database.main.name
   name          = "${var.project_name}-crawler"
   role          = var.glue_role_arn
 
+  # Separate S3 targets for better organization
   s3_target {
-    path = "s3://${var.s3_bucket_name}/"
+    path = "s3://${var.s3_bucket_name}/customers/"
+  }
+  
+  s3_target {
+    path = "s3://${var.s3_bucket_name}/orders/"
   }
 
-  schedule = "cron(0 2 * * ? *)"  # Run daily at 2 AM
+  # Configuration for better schema detection
+  configuration = jsonencode({
+    Version = 1.0
+    Grouping = {
+      TableGroupingPolicy = "CombineCompatibleSchemas"
+    }
+    CrawlerOutput = {
+      Partitions = {
+        AddOrUpdateBehavior = "InheritFromTable"
+      }
+      Tables = {
+        AddOrUpdateBehavior = "MergeNewColumns"
+      }
+    }
+  })
 
+  # Don't run on a schedule initially - use triggers instead
   tags = {
     Name = "${var.project_name}-crawler"
   }
 }
 
-# Glue Trigger to run ETL jobs in sequence
+# Glue Trigger to run ETL jobs in sequence (Daily at 1 AM)
 resource "aws_glue_trigger" "etl_trigger" {
   name = "${var.project_name}-etl-trigger"
   type = "SCHEDULED"
@@ -292,6 +188,48 @@ resource "aws_glue_trigger" "etl_trigger" {
 
   tags = {
     Name = "${var.project_name}-etl-trigger"
+  }
+}
+
+# Glue Trigger to run crawler after ETL jobs complete
+resource "aws_glue_trigger" "crawler_trigger" {
+  name = "${var.project_name}-crawler-trigger"
+  type = "CONDITIONAL"
+  
+  actions {
+    crawler_name = aws_glue_crawler.data_lake_crawler.name
+  }
+  
+  predicate {
+    logical = "AND"
+    
+    conditions {
+      job_name = aws_glue_job.customers_etl.name
+      state    = "SUCCEEDED"
+    }
+    
+    conditions {
+      job_name = aws_glue_job.orders_etl.name
+      state    = "SUCCEEDED"
+    }
+  }
+
+  tags = {
+    Name = "${var.project_name}-crawler-trigger"
+  }
+}
+
+# Optional: Manual trigger for initial crawler run or troubleshooting
+resource "aws_glue_trigger" "crawler_manual_trigger" {
+  name = "${var.project_name}-crawler-manual"
+  type = "ON_DEMAND"
+  
+  actions {
+    crawler_name = aws_glue_crawler.data_lake_crawler.name
+  }
+
+  tags = {
+    Name = "${var.project_name}-crawler-manual"
   }
 }
 
