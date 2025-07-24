@@ -32,19 +32,21 @@ resource "aws_security_group" "rds" {
   }
 }
 
-# DB Subnet Group (keep using private subnets for now)
-resource "aws_db_subnet_group" "main" {
-  name       = "${var.project_name}-db-subnet-group"
-  subnet_ids = var.private_subnet_ids  # Keep private subnets, but enable public access
+# DB Subnet Group (using public subnets for true public access)
+resource "aws_db_subnet_group" "public" {
+  name       = "${var.project_name}-db-subnet-group-public"  # New subnet group
+  subnet_ids = var.public_subnet_ids  # Public subnets
 
   tags = {
-    Name = "${var.project_name}-db-subnet-group"
+    Name = "${var.project_name}-db-subnet-group-public"
   }
 }
 
+# Old subnet group - will be removed after migration
+
 # RDS Instance
 resource "aws_db_instance" "main" {
-  identifier     = "${var.project_name}-postgres"
+  identifier     = "${var.project_name}-postgres-v2"  # Changed to force recreation
   engine         = "postgres"
   engine_version = "15.8"  # Updated to a more recent stable version
   instance_class = "db.t3.micro"
@@ -59,7 +61,7 @@ resource "aws_db_instance" "main" {
   password = var.db_password
   
   vpc_security_group_ids = [aws_security_group.rds.id]
-  db_subnet_group_name   = aws_db_subnet_group.main.name
+  db_subnet_group_name   = aws_db_subnet_group.public.name  # Use the new public subnet group
   
   # Enable public accessibility
   publicly_accessible = true
@@ -72,6 +74,6 @@ resource "aws_db_instance" "main" {
   deletion_protection = false
   
   tags = {
-    Name = "${var.project_name}-postgres"
+    Name = "${var.project_name}-postgres-v2"
   }
 }
