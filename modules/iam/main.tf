@@ -125,23 +125,6 @@ resource "aws_iam_role_policy" "glue_rds_policy" {
   })
 }
 
-# Glue connection for RDS
-resource "aws_glue_connection" "rds_connection" {
-  name = "${var.project_name}-rds-connection"
-
-  connection_properties = {
-    JDBC_CONNECTION_URL = "jdbc:postgresql://${var.rds_endpoint}/analytics_db"
-    USERNAME           = "analytics_user"
-    PASSWORD           = "ChangeMe123!"
-  }
-
-  physical_connection_requirements {
-    availability_zone      = data.aws_availability_zones.available.names[0]
-    security_group_id_list = [aws_security_group.glue_connection.id]
-    subnet_id             = var.private_subnet_ids[0]
-  }
-}
-
 # Security group for Glue connection
 resource "aws_security_group" "glue_connection" {
   name_prefix = "${var.project_name}-glue-connection-"
