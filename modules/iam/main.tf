@@ -125,6 +125,27 @@ resource "aws_iam_role_policy" "glue_rds_policy" {
   })
 }
 
+# Glue CloudWatch Logs access policy
+resource "aws_iam_role_policy" "glue_cloudwatch_logs_policy" {
+  name = "${var.project_name}-glue-cloudwatch-logs-policy"
+  role = aws_iam_role.glue_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = "arn:aws:logs:*:*:*"
+      }
+    ]
+  })
+}
+
 # Security group for Glue connection
 resource "aws_security_group" "glue_connection" {
   name_prefix = "${var.project_name}-glue-connection-"
