@@ -3,11 +3,21 @@ resource "aws_security_group" "rds" {
   name_prefix = "${var.project_name}-rds-"
   vpc_id      = var.vpc_id
 
+  # Allow VPC internal access
   ingress {
     from_port   = 5432
     to_port     = 5432
     protocol    = "tcp"
     cidr_blocks = ["10.0.0.0/16"]
+  }
+
+  # Allow public access (WARNING: This is for development only!)
+  ingress {
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]  # Allow from anywhere
+    description = "Public PostgreSQL access - DEVELOPMENT ONLY"
   }
 
   egress {
@@ -22,10 +32,10 @@ resource "aws_security_group" "rds" {
   }
 }
 
-# DB Subnet Group
+# DB Subnet Group (keep using private subnets for now)
 resource "aws_db_subnet_group" "main" {
   name       = "${var.project_name}-db-subnet-group"
-  subnet_ids = var.private_subnet_ids
+  subnet_ids = var.private_subnet_ids  # Keep private subnets, but enable public access
 
   tags = {
     Name = "${var.project_name}-db-subnet-group"
@@ -50,6 +60,9 @@ resource "aws_db_instance" "main" {
   
   vpc_security_group_ids = [aws_security_group.rds.id]
   db_subnet_group_name   = aws_db_subnet_group.main.name
+  
+  # Enable public accessibility
+  publicly_accessible = true
   
   backup_retention_period = 7
   backup_window          = "03:00-04:00"

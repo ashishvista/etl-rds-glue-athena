@@ -88,6 +88,7 @@ module "rds" {
   
   vpc_id               = aws_vpc.main.id
   private_subnet_ids   = aws_subnet.private[*].id
+  public_subnet_ids    = aws_subnet.public[*].id  # Added for public access
   project_name         = var.project_name
   db_name              = var.db_name
   db_username          = var.db_username
