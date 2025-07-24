@@ -67,40 +67,42 @@ def extract_from_rds_incremental(table_name, connection_name, last_timestamp):
     
     print(f"🔍 Extracting incremental data for {table_name} since {last_timestamp}")
     
-    # Build incremental query based on table
-    if table_name == "customers":
-        # For customers, check both created_at and updated_at
-        query = f"""
-        (SELECT * FROM {table_name} 
-         WHERE created_at > '{last_timestamp}' 
-            OR updated_at > '{last_timestamp}'
-        ) as incremental_data
-        """
-    elif table_name == "orders":
-        # For orders, check both order_date and updated_at
-        query = f"""
-        (SELECT * FROM {table_name} 
-         WHERE (order_date >= '{last_timestamp[:10]}' AND order_date >= CURRENT_DATE - INTERVAL '7 days')
-            OR updated_at > '{last_timestamp}'
-        ) as incremental_data
-        """
+    # For first run or when no timestamp metadata exists, get all data
+    # Check if this looks like a default timestamp (30 days ago)
+    default_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+    
+    if last_timestamp.startswith(default_date):
+        print(f"🚀 First run detected for {table_name}, extracting all data")
+        # For first run, use simple table reference
+        dbtable = f"public.{table_name}"
     else:
-        # Default: use updated_at if available, otherwise all data
-        query = f"""
-        (SELECT * FROM {table_name} 
-         WHERE updated_at > '{last_timestamp}' 
-            OR created_at > '{last_timestamp}'
-        ) as incremental_data
-        """
+        # Build incremental query based on table
+        if table_name == "customers":
+            # For customers, check both created_at and updated_at
+            dbtable = f"""(SELECT * FROM public.{table_name} 
+             WHERE created_at > '{last_timestamp}' 
+                OR updated_at > '{last_timestamp}') as incremental_data"""
+        elif table_name == "orders":
+            # For orders, check both order_date and updated_at
+            dbtable = f"""(SELECT * FROM public.{table_name} 
+             WHERE order_date >= '{last_timestamp[:10]}'
+                OR updated_at > '{last_timestamp}') as incremental_data"""
+        else:
+            # Default: use updated_at if available, otherwise all data
+            dbtable = f"""(SELECT * FROM public.{table_name} 
+             WHERE updated_at > '{last_timestamp}' 
+                OR created_at > '{last_timestamp}') as incremental_data"""
+    
+    print(f"📝 Using dbtable: {dbtable}")
     
     # Read from PostgreSQL using incremental query
     dynamic_frame = glueContext.create_dynamic_frame.from_options(
         connection_type="postgresql",
-        connection_options={{
+        connection_options={
             "useConnectionProperties": "true",
-            "dbtable": query,
+            "dbtable": dbtable,
             "connectionName": connection_name,
-        }},
+        },
         transformation_ctx=f"extract_incremental_{table_name}"
     )
     

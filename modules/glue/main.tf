@@ -10,6 +10,14 @@ resource "aws_security_group" "glue_job" {
   name_prefix = "${var.project_name}-glue-job-"
   vpc_id      = var.vpc_id
 
+  # Self-referencing rule for Glue jobs to communicate with each other
+  ingress {
+    from_port = 0
+    to_port   = 65535
+    protocol  = "tcp"
+    self      = true
+  }
+
   egress {
     from_port   = 0
     to_port     = 0

@@ -78,6 +78,35 @@ resource "aws_route_table_association" "public" {
   route_table_id = aws_route_table.public.id
 }
 
+# VPC S3 Endpoint for Glue jobs to access S3 from private subnets
+resource "aws_vpc_endpoint" "s3" {
+  vpc_id            = aws_vpc.main.id
+  service_name      = "com.amazonaws.us-east-1.s3"
+  vpc_endpoint_type = "Gateway"
+  
+  route_table_ids = [aws_route_table.public.id, aws_route_table.private.id]
+  
+  tags = {
+    Name = "${var.project_name}-s3-endpoint"
+  }
+}
+
+# Route table for private subnets
+resource "aws_route_table" "private" {
+  vpc_id = aws_vpc.main.id
+
+  tags = {
+    Name = "${var.project_name}-private-rt"
+  }
+}
+
+# Associate private subnets with private route table
+resource "aws_route_table_association" "private" {
+  count          = length(aws_subnet.private)
+  subnet_id      = aws_subnet.private[count.index].id
+  route_table_id = aws_route_table.private.id
+}
+
 data "aws_availability_zones" "available" {
   state = "available"
 }
